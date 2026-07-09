@@ -1,0 +1,369 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# ##############################################################################
+# # WARNING: UNVALIDATED                                                      #
+# # These values are derived from research + customer production values and   #
+# # have NOT yet been end-to-end tested on a real EKS cluster. Remove this    #
+# # banner after a live-verify run against a real EKS cluster passes.         #
+# ##############################################################################
+#
+# EKS-specific overrides for the Slurm chart. Use with:
+#   helm install slurm <chart> -f helm-values/base/slurm-values.yaml \
+#                              -f helm-values/eks/slurm-values.yaml
+#
+# Contract: docs/eks/conventions.md
+#   - Node labels:
+#       cpu-control  : control plane (m5.large x2 on-demand) - ctrl/moco/login/syncer/scheduler
+#       cpu-workers  : CPU Slurm compute (m5.large, 0..2 spot, scale-to-zero)
+#       gpu-workers  : GPU Slurm compute (g5.xlarge A10G, 0..1 spot, opt-in)
+#   - StorageClasses: gp3 (default, RWO), efs-sc or cheap-nfs (RWM /home)
+#   - Lock taint    : sunk.coreweave.com/lock=true:NoExecute
+#   - Budget ceiling: < $50/day with default profile (gpu-workers disabled)
+
+global:
+  cks: false
+  # EKS nodes do not resolve in-cluster DNS at the kubelet/host level, so NFS
+  # volume mounts cannot use `nfs-server.tenant-slurm.svc.cluster.local`. We
+  # override with a fixed ClusterIP. The nfs-server Service in
+  # infrastructure/eks/storage/nfs-server-pod-eks.yaml pins clusterIP:
+  # 10.100.97.110 (must lie inside the cluster's service CIDR). Adjust this
+  # value if your cluster uses a different service CIDR.
+  volumes:
+    - name: shared-home
+      nfs:
+        server: "10.100.97.110"
+        path: /
+
+clusterName: "sunk-eks"
+
+controller:
+  stateVolume:
+    storageClassName: gp3
+    size: 20Gi
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+rest:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+
+accounting:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+
+login:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+  service:
+    type: LoadBalancer
+    externalTrafficPolicy: ""
+    metadata:
+      global:
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: nlb
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+          service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+  sshKeyVolume:
+    storageClassName: gp3
+    size: 1Gi
+    accessModes:
+      - ReadWriteOnce
+
+compute:
+  # DefMemPerCPU is cluster-wide. For the default mixed cpu-workers(m5.large)
+  # + opt-in gpu-workers(g5.xlarge) profile, the tightest constraint is
+  # m5.large (2 vCPU / 8 GiB). After the 2 GiB reservedMemory below,
+  # (8192 - 2048) / 2 = 3072, rounded to a safe 3000.
+  reservedMemory: "2048"
+  # slurmd runs privileged with cgroup-management capabilities on EKS. We landed
+  # here after testing every less-privileged alternative on a real EKS AL2023
+  # cluster; each one failed for a distinct reason. The "Tested alternatives"
+  # section in docs/universal/security-model.md walks through cells 3a-3g with
+  # raw kubelet logs. Short version of why we cannot drop privileged on EKS:
+  #   - Capabilities-only (cell 3e): slurmd writes /sys/fs/cgroup unconditionally
+  #     at startup; AL2023's cgroup-namespace=host mounts that tree read-only
+  #     into unprivileged containers, so slurmd crashes before it can serve.
+  #   - AppArmor enforcement (cell 3c): the enroot profile is a separate axis
+  #     from privileged, and AL2023's kubelet does not load custom profiles, so
+  #     `localhost/enroot` admission-fails the pod regardless of caps.
+  # Privileged sidesteps both: it gets a writable cgroup tree and the kubelet
+  # skips AppArmor evaluation. This is an EKS-only exception; GKE and CKS run
+  # the chart's safer capabilities-only default.
+  securityContext:
+    privileged: true
+    capabilities:
+      add:
+        - SYS_NICE
+        - SYS_ADMIN
+        - SYS_PTRACE
+        - SYSLOG
+
+  # Pyxis / enroot configuration for EKS.
+  #
+  # The chart default assumes the enroot seccomp profile has been pre-installed
+  # at /var/lib/kubelet/seccomp/profiles/enroot on every node (the pattern we
+  # use for GKE via infrastructure/universal/seccomp-installer-daemonset.yaml).
+  # On EKS AL2023 the kubelet does not source profiles from that path, so the
+  # DaemonSet would be a no-op even if we shipped it. We deliberately drop the
+  # seccomp profile reference here rather than ship a redundant installer.
+  #
+  # Knob-by-knob:
+  # - appArmorProfile: "" - EKS AL2023 does not load custom AppArmor profiles
+  #   for pods (cell 3c showed the kubelet rejects `localhost/enroot` at
+  #   admission). Setting it empty avoids the rejection. If you migrate to
+  #   Bottlerocket or any AMI that DOES enforce AppArmor, revisit this before
+  #   installing - you will need to vendor the profile onto the host first.
+  # - podSecurityContext: null - intentional clear of the chart's default
+  #   seccomp block (`{type: Localhost, localhostProfile: profiles/enroot}`).
+  #   Without this clear the rendered pod references a profile that no node
+  #   has installed, and the kubelet rejects the pod.
+  # - plugstackOptions: container_scope=job - one enroot container reused across
+  #   all srun steps in a job, rather than one per step. Faster, and matches
+  #   what customers running SUNK on EKS in production use.
+  # - enrootConfig: push cache/data under /var/tmp with per-user subdirs, and
+  #   move TEMP off the container rootfs onto /enroot. On GPU nodegroups (see
+  #   gpu-workers below) /enroot is backed by a hostPath to instance-local NVMe.
+  #
+  # See docs/universal/security-model.md for the full security model and the
+  # "Tested alternatives" matrix.
+  pyxis:
+    enabled: true
+    appArmorProfile: ""
+    # Render-discipline note: setting this to null clears the chart's default
+    # `seccompProfile: {type: Localhost, localhostProfile: profiles/enroot}`
+    # block in the merged values, but helm's mergeOverwrite does NOT remove
+    # leaf keys that have been set by parent values - if you flip
+    # `privileged: false` and then forget to also set `localhostProfile: null`
+    # explicitly, the rendered pod still carries `localhostProfile: profiles/enroot`
+    # and admission fails on EKS. See test cells 3c (AppArmor admission block)
+    # and 3e (cgroup RO crash on capabilities-only) in docs/universal/security-model.md.
+    podSecurityContext: null
+    plugstackOptions:
+      - container_scope=job
+    enrootConfig:
+      ENROOT_CACHE_PATH: /var/tmp/enroot-cache/user-$(id -u)
+      ENROOT_DATA_PATH: /var/tmp/enroot-data/user-$(id -u)
+      ENROOT_TEMP_PATH: /enroot
+
+  # s6 oneshot: create the enroot parent directories with sticky+world-writable
+  # bits on every pod start. enrootConfig above puts per-user subdirs under
+  # these parents (user-$(id -u)); without 1777 on the parents, the first
+  # --container-image job fails with "No such file or directory" on /enroot or
+  # /var/tmp/enroot-{cache,data}. Idempotent; cheap to re-run.
+  s6:
+    enroot-dirs:
+      type: oneshot
+      timeoutUp: 0
+      timeoutDown: 0
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        mkdir -p /enroot
+        chmod 1777 /enroot
+        for dir in /var/tmp/enroot-cache /var/tmp/enroot-data; do
+          mkdir -p "${dir}"
+          chown root:root "${dir}"
+          chmod 1777 "${dir}"
+        done
+  # The chart's calculate-nodesets helper requires every enabled node to carry
+  # a `definitions:` list naming entries from compute-defs/*.yaml (xeon, epyc,
+  # a100, cu128, ...). Those stock defs bake in CoreWeave Cloud labels
+  # (node.coreweave.cloud/*) that EKS lacks. We inline two EKS-native defs
+  # (eks-cpu-m5, eks-gpu-g5) with `enabled: false` so they act as definitions
+  # only, and reference them from the actual nodesets.
+  nodes:
+    eks-cpu-m5:
+      enabled: false
+      staticFeatures:
+        - cpu
+      gresGpu: null
+      skuCpu: "2"
+      resources:
+        requests:
+          cpu: "1"
+          memory: 5Gi
+        limits:
+          memory: 6Gi
+      image:
+        name: controller-extras
+      tolerations:
+        - key: sunk.coreweave.com/lock
+          operator: Exists
+          effect: NoExecute
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: eks.amazonaws.com/nodegroup
+                    operator: In
+                    values:
+                      - cpu-workers
+    eks-gpu-g5:
+      enabled: false
+      staticFeatures:
+        - gpu
+        - l4
+      gresGpu: "l4:1"
+      skuCpu: "4"
+      resources:
+        requests:
+          cpu: "2"
+          memory: 12Gi
+          nvidia.com/gpu: "1"
+        limits:
+          memory: 14Gi
+          nvidia.com/gpu: "1"
+      image:
+        name: slurmd-cw-cu130
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: sunk.coreweave.com/lock
+          operator: Exists
+          effect: NoExecute
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: eks.amazonaws.com/nodegroup
+                    operator: In
+                    values:
+                      - gpu-workers
+    cpu-workers:
+      enabled: true
+      # replicas: 1 (not 0) paired with cluster-config.yaml
+      # `cpu-workers.desiredCapacity: 1` so a fresh deploy can submit a
+      # Slurm job without any extra step. Bump to 2+ for multi-node
+      # examples (07-multi-node-srun etc.) via:
+      #   helm upgrade --set compute.nodes.cpu-workers.replicas=2
+      replicas: 1
+      definitions:
+        - eks-cpu-m5
+      # Override auto-computed partition config. The chart computes
+      # DefMemPerCPU = (limits.memory_MB - reservedMemory_MB) / skuCpu.
+      # For m5.large with our conservative limits (6Gi) and reservedMemory
+      # 2Gi, auto-calc ends up with slightly negative values when the def
+      # resources don't propagate cleanly through the chart's mergeOverwrite.
+      # Pin the partition config explicitly to stay deterministic.
+      # OverSubscribe=FORCE:2 lets two single-CPU jobs share a m5.large
+      # (skuCpu=2); without it OverSubscribe=NO forces one-job-per-node and
+      # examples/10-cpu-share.sh has nothing to assert.
+      partitionConfig:
+        DefMemPerCPU: "3000"
+        OverSubscribe: "FORCE:2"
+    gpu-workers:
+      # Opt-in: enabling this provisions a g5.xlarge (spot, ~$0.30/hr). Requires
+      # G/VT vCPU quota >= 8 in-region. Blows the $50/day ceiling if left on 24/7.
+      enabled: true
+      replicas: 1
+      gresGpu: "l4:1"
+      definitions:
+        - eks-gpu-g5
+        - cu130
+      partitionConfig:
+        DefMemPerCPU: "3000"
+      # NVMe hostPath for Enroot scratch. g5/g6 instance local NVMe is at
+      # /opt/dlami/nvme when using the EKS DLAMI-based GPU AMI; not every GPU
+      # instance family mounts NVMe there (e.g. g4dn differs). Uncomment only
+      # after confirming the path exists on your chosen instance family.
+      # volumeMounts:
+      #   - mountPath: /enroot
+      #     name: enroot-tmp
+      # volumes:
+      #   - name: enroot-tmp
+      #     hostPath:
+      #       path: /opt/dlami/nvme/enroot
+      #       type: DirectoryOrCreate
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: sunk.coreweave.com/lock
+          operator: Exists
+          effect: NoExecute
+
+moco:
+  mysqlCluster:
+    persistence:
+      storageClassName: gp3
+      size: 20Gi
+    nodeSelector:
+      eks.amazonaws.com/nodegroup: cpu-control
+
+# Legacy Bitnami MySQL chart: explicitly disabled on EKS. MOCO replaces it.
+mysql:
+  enabled: false
+
+autoPartition:
+  enabled: false
+
+cacheDropper:
+  enabled: false
+
+sunkDevicePlugin:
+  enabled: false
+
+sunkScheduler:
+  # Dead key in the slurm chart (no template reads it). The real pod scheduler
+  # is the `scheduler:` section further down — that deploys slurm-scheduler,
+  # which handles `schedulerName: sunk` Pods. Left as enabled: false to match
+  # the pre-existing convention in this file.
+  enabled: false
+
+scheduler:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+  # Pin the schedulerName so Pods with `spec.schedulerName: sunk` get picked up.
+  # Default is `<namespace>-<release>-scheduler` (e.g. tenant-slurm-slurm-scheduler)
+  # which requires every Pod spec to hardcode that namespace-derived name —
+  # messy for portable examples/ manifests. Using `sunk` matches the pattern
+  # used by the GKE reference and the skill docs.
+  name: sunk
+  config:
+    scheduler:
+      gpuTypes:
+        # Matches gpu-workers.gresGpu above. If you swap to g6.xlarge (L4) use NVIDIA_L4: l4.
+        NVIDIA_L4: l4
+
+syncer:
+  enabled: true
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+
+# nsscache is an opt-in LDAP/auth integration, installed via the universal
+# configure-sunk-user-auth skill once the base cluster is verified.
+nsscache:
+  enabled: false
+
+# DefMemPerCPU derivation documented in compute.reservedMemory above.
+# cgroupConfig: see docs/universal/security-model.md section "cgroup v2 on EKS".
+# EKS AL2023 uses cgroup v2 unified hierarchy owned by host systemd. Our
+# slurmd runs inside a pod and cannot cleanly own systemd scopes, so we:
+#   - ignore systemd (slurmd writes to the chart-provided cgroup mount directly)
+#   - turn OFF per-task Constrain* enforcement; the k8s pod-level requests and
+#     limits on the slurmd pod are the only resource enforcement boundary.
+# Turning Constrain* ON under a pod-scoped slurmd fails with EACCES against
+# the sysfs cgroup tree. If you need per-task Slurm cgroup enforcement, you
+# need to drop slurmd onto the host (DaemonSet with hostPID + hostNetwork +
+# no pod-level scope), which is a different deployment model than this chart.
+slurmConfig:
+  DefMemPerCPU: 3000
+  cgroupConfig:
+    CgroupPlugin: cgroup/v2
+    IgnoreSystemd: yes
+    ConstrainCores: no
+    ConstrainDevices: no
+    ConstrainRAMSpace: no

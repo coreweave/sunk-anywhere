@@ -1,0 +1,97 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# NFS server for SUNK shared /home on GKE.
+#
+# GKE Persistent Disks are ReadWriteOnce only, and SUNK needs the same
+# /home mounted RW on controller, login, and every compute pod. This
+# manifest runs one NFS server pod backed by a premium-rwo PD and
+# exposes it as a headless Service so every pod can mount it RWX.
+#
+# Apply via:
+#   kubectl apply -f infrastructure/gke/nfs-server.yaml
+#
+# Provider-native values baked in:
+#   - storageClassName: premium-rwo (GKE default SSD)
+#   - nodeAffinity: cloud.google.com/gke-nodepool=cpu-4 (matches the
+#     default node pool created by create-cluster.sh)
+#   - image: itsthenetwork/nfs-server-alpine:12 (the only image
+#     verified working on GKE COS nodes; see deploy-sunk-on-gke SKILL
+#     for the rationale)
+#
+# For other providers, use the matching file:
+#   - EKS: infrastructure/eks/nfs-server.yaml
+#   - Bare-metal/unknown: infrastructure/universal/nfs-server.yaml (template)
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-backing-pvc
+  namespace: tenant-slurm
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: premium-rwo
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: tenant-slurm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+        app: nfs-server
+    spec:
+      tolerations:
+        - key: sunk.coreweave.com/lock
+          operator: Exists
+          effect: NoExecute
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/gke-nodepool
+                    operator: In
+                    values: ["cpu-4"]
+      containers:
+        - name: nfs-server
+          image: itsthenetwork/nfs-server-alpine:12
+          ports:
+            - {name: nfs, containerPort: 2049}
+          env:
+            - {name: SHARED_DIRECTORY, value: "/exports"}
+          securityContext:
+            privileged: true
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 256Mi}
+          volumeMounts:
+            - {name: nfs-storage, mountPath: /exports}
+      volumes:
+        - name: nfs-storage
+          persistentVolumeClaim:
+            claimName: nfs-backing-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: tenant-slurm
+spec:
+  ports:
+    - {name: nfs, port: 2049}
+    - {name: mountd, port: 20048}
+    - {name: rpcbind, port: 111}
+  selector:
+    app: nfs-server
+  clusterIP: None

@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# GCM (GPU Cluster Monitoring from facebookresearch/gcm) values for EKS.
+#
+# GCM runs Node Problem Detector with 6 periodic GPU health checks
+# (XID errors, ECC, NVLink, DCGM diag, zombie procs, GPU disconnect) and
+# reports them as k8s node conditions + Prometheus counters.
+#
+# Differences vs helm-values/gke/gcm-values.yaml:
+#   - No port collision: EKS does not ship a cluster-wide NPD, so the
+#     default k8s exporter port (10257) is free. We keep it on.
+#   - Tolerations include the lock taint so the NPD DaemonSet stays on a
+#     node while a Slurm job is running (same pattern as the kube-system
+#     patches in infrastructure/eks/patch-eks-tolerations.sh).
+
+healthChecks:
+  enabled: true
+  cluster: sunk-eks
+  gpuCount: 1
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  nodeSelector:
+    # Scope to our GPU nodegroup. If you add more GPU nodegroup names in
+    # cluster-config.yaml, widen this to a label all of them share (e.g.
+    # node.coreweave.cloud/class: gpu applied by eksctl labels:).
+    node.coreweave.cloud/class: gpu
+
+monitoring:
+  enabled: true

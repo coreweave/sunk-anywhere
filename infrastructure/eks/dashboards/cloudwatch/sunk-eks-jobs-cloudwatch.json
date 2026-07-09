@@ -1,0 +1,126 @@
+{
+  "widgets": [
+    {
+      "type": "text",
+      "x": 0, "y": 0, "width": 24, "height": 2,
+      "properties": {
+        "markdown": "# SUNK Jobs (CloudWatch)\nLive view of Slurm compute pods, GPU jobs, and pod scheduler activity in `tenant-slurm`.\n\nMetric source: CloudWatch ContainerInsights (cwagent enhanced container insights).\nFor Slurm-specific job-state metrics (queue depth, scheduler cycle, etc.) see Grafana — those come from the in-cluster syncer PodMonitor scraped by kube-prometheus-stack."
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 2, "width": 12, "height": 6,
+      "properties": {
+        "title": "Slurmd Compute Pod CPU (%)",
+        "view": "timeSeries", "stacked": false, "region": "us-east-2",
+        "stat": "Average", "period": 60,
+        "metrics": [
+          [ "ContainerInsights", "pod_cpu_utilization", "Namespace", "tenant-slurm", "ClusterName", "__CLUSTER_NAME__", "PodName", "slurm-cpu-workers", { "label": "cpu-workers" } ],
+          [ "...", "PodName", "slurm-gpu-workers", { "label": "gpu-workers" } ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12, "y": 2, "width": 12, "height": 6,
+      "properties": {
+        "title": "Slurmd Compute Pod Memory (%)",
+        "view": "timeSeries", "stacked": false, "region": "us-east-2",
+        "stat": "Average", "period": 60,
+        "metrics": [
+          [ "ContainerInsights", "pod_memory_utilization", "Namespace", "tenant-slurm", "ClusterName", "__CLUSTER_NAME__", "PodName", "slurm-cpu-workers", { "label": "cpu-workers" } ],
+          [ "...", "PodName", "slurm-gpu-workers", { "label": "gpu-workers" } ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 8, "width": 12, "height": 6,
+      "properties": {
+        "title": "Pods Running by Namespace",
+        "view": "timeSeries", "stacked": true, "region": "us-east-2",
+        "stat": "Maximum", "period": 60,
+        "metrics": [
+          [ "ContainerInsights", "pod_number_of_running_containers", "ClusterName", "__CLUSTER_NAME__", "Namespace", "tenant-slurm" ],
+          [ "...", "Namespace", "sunk" ],
+          [ "...", "Namespace", "monitoring" ],
+          [ "...", "Namespace", "amazon-cloudwatch" ],
+          [ "...", "Namespace", "kube-system" ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12, "y": 8, "width": 12, "height": 6,
+      "properties": {
+        "title": "Pod Restarts (sum / 5min)",
+        "view": "timeSeries", "stacked": false, "region": "us-east-2",
+        "stat": "Sum", "period": 300,
+        "metrics": [
+          [ "ContainerInsights", "pod_container_status_waiting_reason_crash_loop_back_off", "ClusterName", "__CLUSTER_NAME__", "Namespace", "tenant-slurm" ],
+          [ "...", "pod_container_status_terminated_reason_oom_killed", ".", ".", ".", "." ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 14, "width": 8, "height": 6,
+      "properties": {
+        "title": "GPU Utilization (%) — per pod",
+        "view": "timeSeries", "stacked": false, "region": "us-east-2",
+        "stat": "Maximum", "period": 60,
+        "metrics": [
+          [ "ContainerInsights", "pod_gpu_utilization", "ClusterName", "__CLUSTER_NAME__", "Namespace", "tenant-slurm" ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8, "y": 14, "width": 8, "height": 6,
+      "properties": {
+        "title": "GPU Memory Used (MiB) — per pod",
+        "view": "timeSeries", "stacked": false, "region": "us-east-2",
+        "stat": "Maximum", "period": 60,
+        "metrics": [
+          [ "ContainerInsights", "pod_gpu_memory_used", "ClusterName", "__CLUSTER_NAME__", "Namespace", "tenant-slurm" ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16, "y": 14, "width": 8, "height": 6,
+      "properties": {
+        "title": "GPU Tensor-Core Utilization (%)",
+        "view": "timeSeries", "stacked": false, "region": "us-east-2",
+        "stat": "Average", "period": 60,
+        "metrics": [
+          [ "ContainerInsights", "pod_gpu_tensor_core_utilization", "ClusterName", "__CLUSTER_NAME__", "Namespace", "tenant-slurm" ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 20, "width": 12, "height": 6,
+      "properties": {
+        "title": "Pod Network — Receive (bytes/s)",
+        "view": "timeSeries", "stacked": true, "region": "us-east-2",
+        "stat": "Average", "period": 60,
+        "metrics": [
+          [ "ContainerInsights", "pod_network_rx_bytes", "ClusterName", "__CLUSTER_NAME__", "Namespace", "tenant-slurm" ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12, "y": 20, "width": 12, "height": 6,
+      "properties": {
+        "title": "Pod Network — Transmit (bytes/s)",
+        "view": "timeSeries", "stacked": true, "region": "us-east-2",
+        "stat": "Average", "period": 60,
+        "metrics": [
+          [ "ContainerInsights", "pod_network_tx_bytes", "ClusterName", "__CLUSTER_NAME__", "Namespace", "tenant-slurm" ]
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# GCM (facebookresearch/gcm) GPU health-check values for GKE.
+#
+# OPTIONAL on GKE. The default GKE GPU monitoring flow (DCGM exporter,
+# GMP PodMonitoring, Cloud Monitoring dashboards) does not include GCM.
+# Install GCM only when you specifically want continuous on-node GPU
+# health probing surfaced as Node conditions. After helm install, run
+# `bash infrastructure/gke/patch-gcm-for-gke.sh` to mount the NVIDIA
+# libraries from the GKE driver path.
+#
+# `healthChecks.cluster` should match the SUNK clusterName used in the
+# Slurm chart values (default `sunk` per `helm-values/gke/slurm-values.yaml`).
+
+healthChecks:
+  enabled: true
+  cluster: sunk
+  gpuCount: 1
+  prometheus:
+    # GKE runs its own NPD on 20256/20257, so use a different port
+    port: 20357
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+    - key: sunk.coreweave.com/lock
+      operator: Equal
+      value: "true"
+      effect: NoExecute
+
+# Disable k8s exporter (--port=0) to avoid conflict with GKE NPD
+monitoring:
+  enabled: false

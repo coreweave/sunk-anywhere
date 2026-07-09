@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+---
+# Default StorageClass for sunk-anywhere EKS clusters.
+#
+# Fresh EKS ships with `gp2` as the default StorageClass. We prefer gp3:
+# cheaper ($0.08/GB-mo vs $0.10), higher baseline IOPS (3000 vs 100), and
+# provisioned by the EBS CSI driver (ebs.csi.aws.com) rather than the
+# in-tree provisioner.
+#
+# Applied by infrastructure/eks/create-cluster.sh after the cluster is
+# ACTIVE. The script also patches gp2 to is-default-class=false so only
+# one default exists.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  encrypted: "true"

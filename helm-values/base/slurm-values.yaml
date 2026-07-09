@@ -1,0 +1,360 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# Slurm Chart - Universal base values
+# Provider-agnostic Slurm configuration. Layer provider-specific overrides on top:
+#   helm install slurm <chart> -f helm-values/base/slurm-values.yaml -f helm-values/<provider>/slurm-values.yaml
+
+global:
+  # REQUIRED: pull from public GHCR, not CoreWeave internal registry
+  cks: false
+  # REQUIRED outside CoreWeave: clear the chart's default
+  # node.coreweave.cloud/class affinity so provider overlays can target
+  # their own node labels.
+  nodeSelector:
+    affinity: null
+  # Shared NFS volume for /home across all Slurm pods
+  volumes:
+    - name: shared-home
+      nfs:
+        server: nfs-server.tenant-slurm.svc.cluster.local
+        path: /
+  volumeMounts:
+    - name: shared-home
+      mountPath: /home
+
+clusterName: "my-sunk-cluster"
+
+# -- Controller (slurmctld)
+controller:
+  image:
+    repository: ghcr.io/coreweave/slurm-containers/controller
+    tag: v25.05.3-coreweave.5-ubuntu22.04
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  stateVolume:
+    # PROVIDER: Set storageClassName for your cloud (gke: premium-rwo, eks: gp3)
+    storageClassName: null
+    size: 5Gi
+  # fsGroup: 401 is the slurm group baked into the controller image. CSI
+  # drivers that honour fsGroup (EBS, GCE PD) will chgrp the
+  # mounted PVC at attach time, so slurmctld (UID 401) can write to
+  # /var/spool/slurmctld/save. CSI drivers that do NOT chown on mount
+  # (Weka, some NFS, some EFS configurations) would otherwise give the
+  # customer "Permission denied" on the state PVC.
+  podSecurityContext:
+    fsGroup: 401
+
+# -- REST API (slurmrestd)
+rest:
+  image:
+    repository: ghcr.io/coreweave/slurm-containers/controller
+    tag: v25.05.3-coreweave.5-ubuntu22.04
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+
+# -- Accounting (slurmdbd)
+accounting:
+  image:
+    repository: ghcr.io/coreweave/slurm-containers/controller
+    tag: v25.05.3-coreweave.5-ubuntu22.04
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+
+# -- Login node
+login:
+  image:
+    repository: ghcr.io/coreweave/slurm-containers/controller-extras
+    tag: v25.05.3-coreweave.5-ubuntu22.04
+  replicas: 1
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+  service:
+    type: ClusterIP
+    externalTrafficPolicy: ""
+  sshKeyVolume:
+    # PROVIDER: Set storageClassName for your cloud
+    storageClassName: null
+    size: 1Gi
+    accessModes:
+      - ReadWriteOnce
+  # Same reason as controller.podSecurityContext.fsGroup above.
+  podSecurityContext:
+    fsGroup: 401
+  loginController:
+    podMonitor:
+      enabled: false
+    vmPodScrape:
+      enabled: false
+  directoryCache:
+    podMonitor:
+      enabled: false
+    vmPodScrape:
+      enabled: false
+
+# -- Compute nodes
+compute:
+  reservedMemory: "0"
+  cacheDropper:
+    enabled: false
+  # Pyxis/enroot gives you `srun --container-image=...`. Provider overlays pick
+  # ONE of three enablement paths:
+  #
+  # 1. Seccomp DaemonSet path (default here): the chart references
+  #    /var/lib/kubelet/seccomp/profiles/enroot. Managed distros don't ship it;
+  #    apply infrastructure/universal/seccomp-installer-daemonset.yaml before
+  #    `helm install slurm`. Works on most providers that don't enforce
+  #    AppArmor.
+  #
+  # 2. Privileged-supersedes path (EKS): pyxis runs without the custom seccomp
+  #    profile; privileged slurmd already has the caps enroot needs. EKS
+  #    overlay overrides `pyxis.appArmorProfile: ""` and
+  #    `pyxis.podSecurityContext: null`. See docs/universal/security-model.md.
+  #
+  # 3. Disabled (GKE): COS enforces AppArmor and the chart's `localhost/enroot`
+  #    profile is absent; pyxis is turned off in the GKE overlay until we ship
+  #    an AppArmor installer DaemonSet.
+  pyxis:
+    enabled: true
+  # Privileged required for cgroup management
+  securityContext:
+    privileged: true
+  nodes:
+    cpu-workers:
+      enabled: true
+      image:
+        repository: ghcr.io/coreweave/slurm-containers/controller-extras
+        tag: v25.05.3-coreweave.5-ubuntu22.04
+      replicas: 2
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+      # PROVIDER: Set nodeSelector for your cloud's CPU node label
+      nodeSelector: {}
+      tolerations: []
+    gpu-workers:
+      enabled: true
+      image:
+        repository: ghcr.io/coreweave/slurm-containers/controller-extras
+        tag: v25.05.3-coreweave.5-ubuntu22.04
+      replicas: 1
+      # PROVIDER: Set gresGpu to match your GPU type (e.g., "l4:1", "a100:8", "h100:8")
+      gresGpu: ""
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+          nvidia.com/gpu: "1"
+        limits:
+          memory: 512Mi
+          nvidia.com/gpu: "1"
+      # PROVIDER: Set nodeSelector for your cloud's GPU node label
+      nodeSelector: {}
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+
+# -- MOCO MySQL (reduced for dev)
+moco:
+  enabled: true
+  mysqlCluster:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+    persistence:
+      # PROVIDER: Set storageClassName for your cloud
+      storageClassName: null
+      size: 5Gi
+
+# -- Disable legacy Bitnami MySQL
+mysql:
+  enabled: false
+
+# -- Disable CoreWeave-specific features
+autoPartition:
+  enabled: false
+
+cacheDropper:
+  enabled: false
+
+sunkDevicePlugin:
+  enabled: false
+
+sunkScheduler:
+  enabled: false
+
+# -- Pod Scheduler (schedules K8s pods via Slurm)
+scheduler:
+  enabled: true
+  priorityClassName: ""
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  scope:
+    type: namespace
+    namespaces: []
+  config:
+    slurm:
+      poolSize: 5
+      usePersistentConnection: true
+      protocolVersion: "24_11"
+    scheduler:
+      gpuTypes:
+        # PROVIDER: Map GPU types to Slurm GRES names for your hardware
+        NVIDIA_L4: l4
+      pollInterval: 10s
+      terminationOffset: 5s
+
+# -- Enable syncer (reduced resources)
+syncer:
+  enabled: true
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# -- Jobs need lock toleration too
+secretJob:
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+
+cleanupCompleting:
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+
+# -- nsscache: LDAP-backed user provisioning via nsscache CronJob
+# Disabled by default, and should stay disabled on sunk-anywhere
+# deployments. nsscache is the mechanism SUNK on CoreWeave Cloud uses
+# for its CW IAM + SCIM pipeline; that pipeline depends on
+# control-plane components that don't exist on EKS/GKE. See
+# `docs/universal/ssh-access.md` ("Pick your path") for the three
+# user-provisioning options available to sunk-anywhere deployments:
+#   1. Simple (default): `bootstrap-sunk-local-user` skill — SSH key +
+#      Linux user + sacctmgr on the login pod.
+#   2. Opt-in: `configure-sunk-authentik-sssd` skill — authentik as the
+#      directory source, sssd on every pod. Leaves this nsscache
+#      setting disabled.
+#   3. Not available here: CW IAM + SCIM (consumes nsscache). Only on
+#      CoreWeave Cloud.
+# If you're running on CoreWeave Cloud and know you need this, enable
+# it in your overlay AFTER creating the `nsscache-ldap-credentials`
+# secret AND pointing at a reachable directory — otherwise the CronJob
+# lands in an Error loop.
+nsscache:
+  enabled: false
+  existingSecret: nsscache-ldap-credentials
+  cronJobSchedule: "* * * * *"
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  sudoGroups:
+    - slurm-admins
+  nsscacheConfig:
+    default:
+      source: ldap
+      cache: files
+      maps:
+        - passwd
+        - shadow
+        - group
+      timestamp_dir: /var/lib/nsscache
+      ldap_uri: "ldap://openldap.tenant-slurm.svc.cluster.local:389"
+      ldap_base: "dc=sunk,dc=local"
+      ldap_bind_dn: "cn=readonly,dc=sunk,dc=local"
+      ldap_rfc2307bis: 0
+      ldap_default_shell: "/bin/bash"
+      ldap_scope: sub
+      files_dir: /etc/nsscache
+      files_cache_filename_suffix: cache
+    passwd:
+      ldap_filter: "(objectClass=posixAccount)"
+    group:
+      ldap_filter: "(objectClass=posixGroup)"
+    shadow:
+      ldap_filter: "(objectClass=shadowAccount)"
+  nsswitchConfig:
+    passwd:
+      - files
+      - cache
+    group:
+      - files
+      - cache
+    shadow: []
+
+# -- Munge sidecar (reduced for dev)
+munge:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# -- Slurm config
+# Note: CgroupPlugin is set by the chart automatically, do not set manually
+slurmConfig:
+  DefMemPerCPU: 100

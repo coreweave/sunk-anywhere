@@ -1,0 +1,107 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# kube-prometheus-stack values for EKS
+# Budget profile: fits on 2x m5.large (8 CPU / 32 GiB total control plane)
+# See docs/eks/conventions.md
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 7d  # shorter for budget profile
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi  # smaller for budget
+    # Match PodMonitors/ServiceMonitors regardless of label
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    # Keep Prometheus on the control-plane nodegroup
+    nodeSelector:
+      eks.amazonaws.com/nodegroup: cpu-control
+    tolerations:
+      - key: sunk.coreweave.com/lock
+        operator: Exists
+        effect: NoExecute
+
+grafana:
+  enabled: true
+  adminPassword: ""  # empty = random; fetch via `kubectl get secret`
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  persistence:
+    enabled: true
+    storageClassName: gp3
+    size: 5Gi
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  # Auto-provision the SUNK dashboard
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: sunk-eks
+          folder: SUNK
+          type: file
+          options:
+            path: /var/lib/grafana/dashboards/sunk-eks
+  dashboardsConfigMaps:
+    sunk-eks: sunk-eks-dashboards  # ConfigMap created by install.sh
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+    nodeSelector:
+      eks.amazonaws.com/nodegroup: cpu-control
+
+# Keep node-exporter + kube-state-metrics on all nodes but tolerate lock
+nodeExporter:
+  enabled: true
+prometheusNodeExporter:
+  tolerations:
+    - operator: Exists
+
+kubeStateMetrics:
+  enabled: true
+
+# EKS kubelet is not scrapable via cluster role in the same way as vanilla K8s.
+# Disable components that produce errors on EKS.
+kubeControllerManager:
+  enabled: false  # managed by EKS, not exposed
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false

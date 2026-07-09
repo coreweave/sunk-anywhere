@@ -1,0 +1,156 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+---
+# Budget-profile shared /home for SUNK on EKS.
+#
+# An in-cluster NFS-server pod backed by a gp3 EBS PVC exposes a
+# ReadWriteMany mount via a ClusterIP service. Costs roughly the price
+# of the EBS volume only (~$8/mo for 100 GiB gp3), versus ~$30/mo for
+# the equivalent EFS burst deployment.
+#
+# Layout (applied in order):
+#   1. PVC `nfs-backing-pvc` on gp3 (RWO, 100Gi)
+#   2. Deployment `nfs-server` on the cpu-control nodegroup
+#   3. ClusterIP Service `nfs-server` exposing 2049/20048/111
+#   4. StorageClass `cheap-nfs` (no-provisioner; placeholder for conventions.md)
+#   5. Static PV `slurm-home-nfs` pointing at the service, 100Gi RWX
+#   6. Static PVC `slurm-home` (same name as EFS path; helm values unchanged)
+#
+# Use this OR the EFS path, not both. Per docs/eks/conventions.md.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-backing-pvc
+  namespace: tenant-slurm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: tenant-slurm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+        app: nfs-server
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: cpu-control
+      tolerations:
+        - key: sunk.coreweave.com/lock
+          operator: Exists
+          effect: NoExecute
+      containers:
+        - name: nfs-server
+          image: itsthenetwork/nfs-server-alpine:12
+          ports:
+            - name: nfs
+              containerPort: 2049
+            - name: mountd
+              containerPort: 20048
+            - name: rpcbind
+              containerPort: 111
+          env:
+            - name: SHARED_DIRECTORY
+              value: "/exports"
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: nfs-storage
+              mountPath: /exports
+      volumes:
+        - name: nfs-storage
+          persistentVolumeClaim:
+            claimName: nfs-backing-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: tenant-slurm
+spec:
+  type: ClusterIP
+  # EKS worker nodes do NOT forward queries to the cluster DNS (CoreDNS),
+  # so kubelet-level NFS mounts cannot resolve svc.cluster.local names. We
+  # pin the ClusterIP so `global.volumes.nfs.server` in helm-values/eks/
+  # slurm-values.yaml can reference it by IP instead of DNS. Keep this value
+  # and the one in helm-values/eks/slurm-values.yaml in sync.
+  clusterIP: 10.100.97.110
+  ports:
+    - name: nfs
+      port: 2049
+      targetPort: 2049
+    - name: mountd
+      port: 20048
+      targetPort: 20048
+    - name: rpcbind
+      port: 111
+      targetPort: 111
+  selector:
+    app: nfs-server
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: cheap-nfs
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: Immediate
+reclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: slurm-home-nfs
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: cheap-nfs
+  mountOptions:
+    - nfsvers=4.1
+    - hard
+    - timeo=600
+    - retrans=2
+  nfs:
+    # Pinned ClusterIP above in the Service; kubelet cannot resolve
+    # svc.cluster.local for NFS mounts.
+    server: 10.100.97.110
+    path: /
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: slurm-home
+  namespace: tenant-slurm
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: cheap-nfs
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: slurm-home-nfs

@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# authentik-minimal — single-replica authentik for sunk-anywhere validation.
+#
+# Sized to fit on a 2-node e2-standard-4 (GKE) or m5.large-class (EKS)
+# cluster with SUNK already running. DO NOT USE IN PRODUCTION — no HA,
+# embedded Postgres/Redis (chart defaults), no persistent tuning.
+#
+# Customer-production authentik profile:
+#   solutions-architecture-services/charts/authentik-ha
+# That one wants 4-8 GiB RAM per replica and multiple replicas; this one
+# fits in ~2 GiB total.
+
+authentik:
+  # Secret key is a throwaway for the test cluster. Regenerate with
+  # `openssl rand -base64 60` and pass via `--set authentik.secret_key=...`
+  # for any cluster that isn't pure throwaway.
+  secret_key: "REPLACE_ME_WITH_openssl_rand_-base64_60"
+  error_reporting:
+    enabled: false
+
+  # Embedded outposts are good enough for a validation cluster.
+  outposts:
+    container_image_base: ghcr.io/goauthentik/%(type)s:%(version)s
+
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 768Mi
+
+worker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Embedded Postgres — fine for validation, not production.
+postgresql:
+  enabled: true
+  auth:
+    password: "authentik-test-pg-pw"
+  primary:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 192Mi
+      limits:
+        memory: 384Mi
+    persistence:
+      size: 2Gi
+
+redis:
+  enabled: true
+  architecture: standalone
+  master:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+    persistence:
+      size: 1Gi
+  auth:
+    enabled: false
+
+# Route ClusterIP only; no LB (we access the admin UI via port-forward
+# during setup, and SUNK reaches the outpost via ClusterIP).
+service:
+  type: ClusterIP
+  http:
+    port: 80
+
+# The LDAP outpost is deployed from authentik's admin UI post-install.
+# seed-test-users.sh handles that via the API. If you prefer GUI,
+# kubectl port-forward the server and log in at http://localhost:9000
+# with username: akadmin, password printed by install.sh.

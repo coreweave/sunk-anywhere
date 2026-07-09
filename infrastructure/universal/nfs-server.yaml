@@ -1,0 +1,99 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+---
+# NFS server for shared /home across Slurm pods — UNIVERSAL TEMPLATE.
+#
+# PREFER THE PER-CLOUD FILE IF YOU'RE ON A SUPPORTED PROVIDER:
+#   - GKE: infrastructure/gke/nfs-server.yaml (premium-rwo, cpu-4)
+#   - EKS: infrastructure/eks/storage/nfs-server-pod-eks.yaml
+#          (gp3 + cheap-nfs StorageClass + static PV/PVC the chart expects)
+#
+# Those files apply clean without edits. Only use this universal
+# template for bare-metal or providers without a shipped file.
+#
+# Cloud-managed disks are typically RWO-only, so we run an NFS server
+# pod to export a shared volume.
+#
+# PROVIDER: Adjust the following for your environment:
+#   - storageClassName: Set to your cloud's block storage class
+#   - nodeAffinity: Set matchExpressions to target your CPU/infra nodes
+#     Bare-metal example: key: node-role.kubernetes.io/cpu, operator: Exists
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-backing-pvc
+  namespace: tenant-slurm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # PROVIDER: Set storageClassName for your cloud
+  storageClassName: null
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: tenant-slurm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+        app: nfs-server
+    spec:
+      tolerations:
+        - key: sunk.coreweave.com/lock
+          operator: Exists
+          effect: NoExecute
+      # PROVIDER: Replace with your node selector to schedule on CPU/infra nodes.
+      # See comment at top of file for provider-specific examples.
+      affinity: {}
+      containers:
+        - name: nfs-server
+          image: itsthenetwork/nfs-server-alpine:12
+          ports:
+            - name: nfs
+              containerPort: 2049
+          env:
+            - name: SHARED_DIRECTORY
+              value: "/exports"
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: nfs-storage
+              mountPath: /exports
+      volumes:
+        - name: nfs-storage
+          persistentVolumeClaim:
+            claimName: nfs-backing-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: tenant-slurm
+spec:
+  ports:
+    - name: nfs
+      port: 2049
+    - name: mountd
+      port: 20048
+    - name: rpcbind
+      port: 111
+  selector:
+    app: nfs-server
+  clusterIP: None

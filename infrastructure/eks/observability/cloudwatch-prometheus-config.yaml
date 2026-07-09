@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# ConfigMap consumed by the cloudwatch-agent DaemonSet (managed by the
+# amazon-cloudwatch-observability addon). The agent reads this file when
+# `.spec.config.logs.metrics_collected.prometheus.prometheus_config_path` is
+# set on the AmazonCloudWatchAgent CR.
+#
+# We scrape two Prometheus endpoints already present in a SUNK-on-EKS cluster:
+#   1. sunk-syncer       (tenant-slurm/slurm-syncer, port 8080 /metrics) — Slurm
+#                        controller stats: jobs running/pending, node state,
+#                        partition info, scheduler cycle.
+#   2. dcgm-exporter     (monitoring/dcgm-exporter, port 9400 /metrics) — GPU
+#                        utilization, memory, power, temp, ECC, XID errors.
+#
+# The full Prometheus output (~439 active series at idle) is NOT forwarded to
+# CloudWatch — the EMF processor in the AmazonCloudWatchAgent CR applies a
+# strict `metric_declaration` whitelist, keeping ~30 streams in the
+# `ContainerInsights/Prometheus` namespace. See
+# infrastructure/eks/observability/cloudwatch-prometheus-cr-patch.sh.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: amazon-cloudwatch
+  labels:
+    app.kubernetes.io/managed-by: sunk-anywhere
+    app.kubernetes.io/component: cloudwatch-prometheus-scrape
+data:
+  prometheus.yaml: |
+    global:
+      scrape_interval: 60s
+      scrape_timeout: 15s
+
+    scrape_configs:
+      # ----------------------------------------------------------------------
+      # SUNK syncer: Slurm controller metrics
+      # ----------------------------------------------------------------------
+      - job_name: sunk-syncer
+        sample_limit: 10000
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [tenant-slurm]
+        relabel_configs:
+          # Keep only the syncer pod; the port name "metrics" pins the right port.
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            action: keep
+            regex: sunk-syncer
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: metrics
+          # Surface the namespace + pod as Prometheus labels so EMF dimensions
+          # can reference them.
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: Namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: PodName
+
+      # ----------------------------------------------------------------------
+      # DCGM exporter: GPU metrics
+      # ----------------------------------------------------------------------
+      - job_name: dcgm-exporter
+        sample_limit: 10000
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [monitoring]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            action: keep
+            regex: dcgm-exporter
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: metrics
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: Namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: PodName

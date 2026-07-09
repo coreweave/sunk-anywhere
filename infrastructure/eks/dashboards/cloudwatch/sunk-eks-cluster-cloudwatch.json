@@ -1,0 +1,259 @@
+{
+  "widgets": [
+    {
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 24,
+      "height": 2,
+      "properties": {
+        "markdown": "# SUNK on EKS \u2014 Cluster Overview\n\nNode + pod metrics from CloudWatch Container Insights (`ContainerInsights` namespace) and GPU metrics from the addon-bundled DCGM exporter (`ContainerInsights/Prometheus`). Pair with `sunk-eks-jobs-cloudwatch` for Slurm-job throughput. Region/cluster substituted at install time by `infrastructure/eks/install-cw-dashboards.sh`."
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 2,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Cluster CPU Utilization (%)",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Average",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "node_cpu_utilization",
+            "ClusterName",
+            "__CLUSTER_NAME__"
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 2,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Cluster Memory Utilization (%)",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Average",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "node_memory_utilization",
+            "ClusterName",
+            "__CLUSTER_NAME__"
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 8,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Pods Running (by namespace)",
+        "view": "timeSeries",
+        "stacked": true,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Maximum",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "pod_number_of_running_containers",
+            "ClusterName",
+            "__CLUSTER_NAME__",
+            "Namespace",
+            "tenant-slurm"
+          ],
+          [
+            "...",
+            "sunk"
+          ],
+          [
+            "...",
+            "monitoring"
+          ],
+          [
+            "...",
+            "kube-system"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 8,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Network Throughput (bytes/s)",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Average",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "node_network_total_bytes",
+            "ClusterName",
+            "__CLUSTER_NAME__"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 8,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Filesystem Utilization (%)",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Average",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "node_filesystem_utilization",
+            "ClusterName",
+            "__CLUSTER_NAME__"
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 14,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "GPU Utilization (%) \u2014 DCGM",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Average",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "node_gpu_utilization",
+            "ClusterName",
+            "__CLUSTER_NAME__"
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 14,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "GPU Memory Used (MiB)",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Average",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "node_gpu_memory_used",
+            "ClusterName",
+            "__CLUSTER_NAME__"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 20,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "GPU Power Draw (W)",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Average",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "node_gpu_power_draw",
+            "ClusterName",
+            "__CLUSTER_NAME__"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 20,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "GPU Temperature (\u00b0C)",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-2",
+        "period": 60,
+        "stat": "Maximum",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "node_gpu_temperature",
+            "ClusterName",
+            "__CLUSTER_NAME__"
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+---
+# eksctl ClusterConfig for sunk-anywhere budget profile.
+#
+# Conventions contract: docs/eks/conventions.md
+#
+# Nodegroups in this file:
+#   - cpu-control: 2x m5.large on-demand (controller, MOCO, login, operator).
+#   - cpu-workers: 0-2x m5.large spot, scale-to-zero (Slurm CPU compute).
+#
+# GPU nodegroup is added later via the add-gpu-nodes-to-eks skill. This file
+# is intentionally GPU-free so an empty cluster stays ~$5-6/day.
+#
+# Addons: intentionally empty. install-controllers.sh installs ebs-csi-driver
+# (and friends) via `aws eks create-addon` with IRSA role ARNs that don't
+# exist until setup-irsa.sh has run. Installing them here would create a
+# non-deterministic partial state if setup-irsa.sh fails.
+#
+# Networking: eksctl's default is a private+public VPC with one NAT Gateway
+# (~$1.08/day fixed). Accepted for simplicity; a follow-up can explore
+# fully-public-subnet mode to shave that cost.
+#
+# Rendering: values of metadata.name and metadata.region are templated so
+# create-cluster.sh can override them via envsubst when --name/--region are
+# passed. Other fields are literal because eksctl doesn't expand env vars.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: ${CLUSTER_NAME}
+  region: ${AWS_REGION}
+  version: "1.30"
+  tags:
+    Environment: dev
+    Service: sunk
+    ManagedBy: sunk-anywhere
+    Owner: auto-cleanup
+
+iam:
+  withOIDC: true
+
+# Install the core networking addons at create time. Without these, nodes
+# come up NotReady with "cni plugin not initialized" and everything
+# downstream (seccomp DaemonSet, Slurm controller, compute pods) stalls
+# forever. These three don't need IRSA, so it's safe to install them here.
+#
+# IRSA-dependent addons (ebs-csi-driver, aws-load-balancer-controller)
+# are still deferred to infrastructure/eks/install-controllers.sh where
+# they can reference the IAM roles created by setup-irsa.sh.
+addons:
+  - name: vpc-cni
+  - name: kube-proxy
+  - name: coredns
+
+managedNodeGroups:
+  # NOTE: Do NOT set labels starting with reserved prefixes (eks.amazonaws.com/,
+  # kubernetes.io/, k8s.io/). EKS auto-applies "eks.amazonaws.com/nodegroup:
+  # <ng-name>" at node-join time, so helm-values selectors keyed on that label
+  # still work. If you need custom labels, use an unreserved key.
+  - name: cpu-control
+    instanceType: m5.large
+    # 3 nodes (not 2): slurm-controller + slurm-login + slurm-scheduler +
+    # slurm-syncer + slurm-accounting + moco-slurm-0 + sunk-controller-manager
+    # + nfs-server cumulatively want >~3.5 vCPU after kube-system overhead. At
+    # 2 m5.large (4 vCPU total) we repeatedly hit "Insufficient cpu" with
+    # scheduler stuck Pending. Third node adds headroom for pod-scheduler +
+    # sunkScheduler without blowing the budget (+ $2.30/day on-demand).
+    desiredCapacity: 3
+    minSize: 3
+    maxSize: 3
+    privateNetworking: false
+    volumeSize: 100
+    volumeType: gp3
+    # The SUNK chart hardcodes nodeAffinity on control-plane components
+    # keyed on node.coreweave.cloud/class=cpu and node.coreweave.cloud/
+    # state=production. On non-CW clusters, setting helm `nodeSelector`
+    # alone is not enough -- the chart's affinity block stays and the
+    # pods Pending forever. We label every node with both keys at
+    # join time so the chart's hardcoded affinity is satisfied.
+    labels:
+      node.coreweave.cloud/class: cpu
+      node.coreweave.cloud/state: production
+    tags:
+      Environment: dev
+      Service: sunk
+      ManagedBy: sunk-anywhere
+      Owner: auto-cleanup
+      Nodegroup: cpu-control
+
+  - name: cpu-workers
+    instanceType: m5.large
+    # max 3 (not 2): examples/run-all.sh needs 2+ workers for multi-node
+    # tests (07-multi-node-srun, 11-different-nodes, 12-hetjob). Third slot
+    # gives the scheduler room to handle rolling spot interruptions without
+    # pending the whole queue.
+    #
+    # desiredCapacity: 1 (not 0) so a fresh deploy can submit a Slurm job
+    # without the customer running `helm upgrade --set replicas=N` or
+    # waiting on an autoscaler. Workers cannot share cpu-control nodes
+    # because the sunk.coreweave.com/lock=true:NoExecute taint Slurm
+    # applies when a job runs would evict slurmctld. Cost impact: +$2.30/day
+    # idle (one extra m5.large spot). Autoscaling to zero is a separate
+    # follow-up.
+    desiredCapacity: 1
+    minSize: 0
+    maxSize: 3
+    spot: true
+    volumeSize: 100
+    volumeType: gp3
+    # Same reason as cpu-control above: satisfy the chart's hardcoded
+    # NodeSet affinity.
+    labels:
+      node.coreweave.cloud/class: cpu
+      node.coreweave.cloud/state: production
+    tags:
+      Environment: dev
+      Service: sunk
+      ManagedBy: sunk-anywhere
+      Owner: auto-cleanup
+      Nodegroup: cpu-workers
+
+cloudWatch:
+  clusterLogging:
+    enableTypes:
+      - api
+      - audit
+      - authenticator

@@ -1,0 +1,88 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# Three pods in parallel through the SUNK Pod Scheduler.
+# schedulerName must match the running SUNK scheduler (see 04-validate-pod-scheduler.yaml).
+# Apply: kubectl apply -f 15-multi-pod-scheduler.yaml
+# Watch:  kubectl get pods -n tenant-slurm -l app=sunk-multi-pod --watch
+# Expect: all 3 transition Pending -> Running -> Succeeded.
+# Clean:  kubectl delete -f 15-multi-pod-scheduler.yaml
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sunk-multi-pod-1
+  namespace: tenant-slurm
+  labels:
+    app: sunk-multi-pod
+spec:
+  schedulerName: sunk
+  terminationGracePeriodSeconds: 20
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  containers:
+    - name: test
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 60 && echo ok"]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sunk-multi-pod-2
+  namespace: tenant-slurm
+  labels:
+    app: sunk-multi-pod
+spec:
+  schedulerName: sunk
+  terminationGracePeriodSeconds: 20
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  containers:
+    - name: test
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 60 && echo ok"]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sunk-multi-pod-3
+  namespace: tenant-slurm
+  labels:
+    app: sunk-multi-pod
+spec:
+  schedulerName: sunk
+  terminationGracePeriodSeconds: 20
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  containers:
+    - name: test
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 60 && echo ok"]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+  restartPolicy: Never

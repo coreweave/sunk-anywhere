@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# ##############################################################################
+# # WARNING: UNVALIDATED                                                      #
+# # These values are a starting point for bare-metal or custom Kubernetes     #
+# # clusters. Adjust to match your hardware and node labels.                  #
+# ##############################################################################
+#
+# Generic/bare-metal overrides. Use with:
+#   helm install sunk <chart> -f helm-values/base/sunk-values.yaml -f helm-values/generic/sunk-values.yaml
+
+# On bare-metal, you may need the SUNK-managed NVIDIA device plugin.
+# Set to true if you do not have a separate device plugin installed.
+nvidia-device-plugin:
+  enabled: true
+
+operator:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              # Replace with your CPU node label
+              - key: node-role.kubernetes.io/cpu
+                operator: Exists

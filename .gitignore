@@ -1,0 +1,4 @@
+notes/
+*.log
+*.bak
+.DS_Store

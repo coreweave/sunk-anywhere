@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# ##############################################################################
+# # WARNING: UNVALIDATED                                                      #
+# # These values are derived from research + customer production values and   #
+# # have NOT yet been end-to-end tested on a real EKS cluster. Remove this    #
+# # banner after a live-verify run against a real EKS cluster passes.         #
+# ##############################################################################
+#
+# EKS-specific overrides for the SUNK operator. Use with:
+#   helm install sunk <chart> -f helm-values/base/sunk-values.yaml \
+#                             -f helm-values/eks/sunk-values.yaml
+#
+# Contract: docs/eks/conventions.md
+#   - Node label:        eks.amazonaws.com/nodegroup
+#   - Control nodegroup: cpu-control (m5.large, 2x on-demand)
+#   - Lock taint:        sunk.coreweave.com/lock=true:NoExecute
+#   - cert-manager:      installed separately by infrastructure/eks/install-controllers.sh
+
+# EKS GPU-optimized AMI ships NVIDIA drivers + device plugin, so the SUNK chart
+# should not deploy another one.
+nvidia-device-plugin:
+  enabled: false
+
+# cert-manager is installed as a cluster-level controller by
+# infrastructure/eks/install-controllers.sh, not by the SUNK subchart. Leaving
+# it enabled produces duplicate CRDs and webhook conflicts.
+cert-manager:
+  enabled: false
+
+operator:
+  # Upstream chart hardcodes nodeAffinity on node.coreweave.cloud/class=cpu,
+  # which only exists on CoreWeave Cloud. We redefine nodeSelectorTerms to
+  # match the EKS-native nodegroup label. (Helm replaces lists but merges
+  # maps, so `affinity: {}` would leave the base entries intact.)
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: eks.amazonaws.com/nodegroup
+                operator: In
+                values:
+                  - cpu-control
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+
+scheduler:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+
+syncer:
+  enabled: true
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: cpu-control
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute

@@ -1,0 +1,164 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+---
+# Lightweight OpenLDAP for nsscache user provisioning
+# Provides POSIX users for Slurm authentication
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openldap
+  namespace: tenant-slurm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openldap
+  template:
+    metadata:
+      labels:
+        app: openldap
+    spec:
+      tolerations:
+        - key: sunk.coreweave.com/lock
+          operator: Exists
+          effect: NoExecute
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/gke-nodepool
+                    operator: In
+                    values:
+                      - cpu-4
+      initContainers:
+        - name: copy-seed
+          image: busybox:1.36
+          command: ["sh", "-c", "cp /seed-ro/* /seed-rw/"]
+          volumeMounts:
+            - name: ldap-seed-ro
+              mountPath: /seed-ro
+            - name: ldap-seed-rw
+              mountPath: /seed-rw
+      containers:
+        - name: openldap
+          image: osixia/openldap:1.5.0
+          ports:
+            - containerPort: 389
+              name: ldap
+          env:
+            - name: LDAP_ORGANISATION
+              value: "SUNK GCP"
+            - name: LDAP_DOMAIN
+              value: "sunk.local"
+            - name: LDAP_ADMIN_PASSWORD
+              value: "admin"
+            - name: LDAP_READONLY_USER
+              value: "true"
+            - name: LDAP_READONLY_USER_USERNAME
+              value: "readonly"
+            - name: LDAP_READONLY_USER_PASSWORD
+              value: "readonly"
+            - name: LDAP_REMOVE_CONFIG_AFTER_SETUP
+              value: "false"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: ldap-data
+              mountPath: /var/lib/ldap
+            - name: ldap-config
+              mountPath: /etc/ldap/slapd.d
+            - name: ldap-seed-rw
+              mountPath: /container/service/slapd/assets/config/bootstrap/ldif/custom
+      volumes:
+        - name: ldap-data
+          emptyDir: {}
+        - name: ldap-config
+          emptyDir: {}
+        - name: ldap-seed-ro
+          configMap:
+            name: openldap-seed
+        - name: ldap-seed-rw
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openldap
+  namespace: tenant-slurm
+spec:
+  ports:
+    - port: 389
+      targetPort: 389
+      name: ldap
+  selector:
+    app: openldap
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openldap-seed
+  namespace: tenant-slurm
+data:
+  01-users.ldif: |
+    # Organizational Units
+    dn: ou=users,dc=sunk,dc=local
+    objectClass: organizationalUnit
+    ou: users
+
+    dn: ou=groups,dc=sunk,dc=local
+    objectClass: organizationalUnit
+    ou: groups
+
+    # Groups
+    dn: cn=slurm-users,ou=groups,dc=sunk,dc=local
+    objectClass: posixGroup
+    cn: slurm-users
+    gidNumber: 10000
+    memberUid: testuser
+    memberUid: example-user
+
+    dn: cn=slurm-admins,ou=groups,dc=sunk,dc=local
+    objectClass: posixGroup
+    cn: slurm-admins
+    gidNumber: 10001
+    memberUid: example-user
+
+    # Test users
+    dn: uid=testuser,ou=users,dc=sunk,dc=local
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    objectClass: ldapPublicKey
+    uid: testuser
+    cn: Test User
+    sn: User
+    givenName: Test
+    uidNumber: 10001
+    gidNumber: 10000
+    homeDirectory: /home/testuser
+    loginShell: /bin/bash
+    userPassword: CHANGE_ME
+    sshPublicKey: ssh-ed25519 AAAA_REPLACE_WITH_YOUR_PUBLIC_KEY testuser@example
+
+    dn: uid=example-user,ou=users,dc=sunk,dc=local
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    objectClass: ldapPublicKey
+    uid: example-user
+    cn: Example User
+    sn: User
+    givenName: Example
+    uidNumber: 10002
+    gidNumber: 10001
+    homeDirectory: /home/example-user
+    loginShell: /bin/bash
+    userPassword: CHANGE_ME
+    sshPublicKey: ssh-ed25519 AAAA_REPLACE_WITH_YOUR_PUBLIC_KEY example-user@example

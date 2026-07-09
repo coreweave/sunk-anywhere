@@ -1,0 +1,1807 @@
+{
+  "displayName": "SUNK: Slurm Cluster Overview",
+  "mosaicLayout": {
+    "columns": 48,
+    "tiles": [
+      {
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## Fleet Summary",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Total Nodes",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_nodes_total"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Allocated",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_nodes_alloc"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 12,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Mixed",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_nodes_mix"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 18,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Idle",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_nodes_idle"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Drained",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_nodes_drain"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 30,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Down",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_nodes_down"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 36,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Completing",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_nodes_comp"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 42,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Not Responding",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_nodes_not_responding"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 6,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Node States Over Time (by cluster)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_nodes_alloc"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "${metric.labels.cluster} Allocated"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_nodes_mix"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "${metric.labels.cluster} Mixed"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_nodes_idle"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "${metric.labels.cluster} Idle"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_nodes_drain"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "${metric.labels.cluster} Drained"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_nodes_down"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "${metric.labels.cluster} Down"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_nodes_comp"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "${metric.labels.cluster} Completing"
+              }
+            ],
+            "yAxis": {
+              "label": "nodes"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 6,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Per-Node State (by cluster)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_node_state"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster}/${metric.labels.node}: ${metric.labels.state}"
+              }
+            ],
+            "yAxis": {
+              "label": "state"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 14,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## Partition Resources",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 16,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Partition GPU Allocation",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_partition_gpu_alloc"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.cluster} Alloc: ${metric.labels.partition}"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_partition_gpu_idle"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.cluster} Idle: ${metric.labels.partition}"
+              }
+            ],
+            "yAxis": {
+              "label": "GPUs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 16,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Partition CPU Allocation",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_partition_cpu_alloc"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.cluster} Alloc: ${metric.labels.partition}"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_partition_cpu_idle"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.cluster} Idle: ${metric.labels.partition}"
+              }
+            ],
+            "yAxis": {
+              "label": "CPUs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 16,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Partition Memory Allocation (MB)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_partition_mem_alloc"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "Alloc: ${metric.labels.partition}"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_partition_mem_total - slurm_partition_mem_alloc"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "Free: ${metric.labels.partition}"
+              }
+            ],
+            "yAxis": {
+              "label": "MB"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 24,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "Total GPUs",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "sum(slurm_partition_gpu_total)"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 12,
+        "yPos": 24,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "GPUs Allocated",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "sum(slurm_partition_gpu_alloc)"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 24,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "Total CPUs",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "sum(slurm_partition_cpu_total)"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 36,
+        "yPos": 24,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "CPUs Allocated",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "sum(slurm_partition_cpu_alloc)"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 28,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## Node Resource Allocation",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 30,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "GPU Allocation by Node",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_node_gpu_alloc"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.cluster} Alloc: ${metric.labels.node}"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_node_gpu_idle"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.cluster} Idle: ${metric.labels.node}"
+              }
+            ],
+            "yAxis": {
+              "label": "GPUs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 30,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "CPU Allocation by Node",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_node_cpu_alloc"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Alloc: ${metric.labels.node}"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_node_cpu_total"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Total: ${metric.labels.node}"
+              }
+            ],
+            "yAxis": {
+              "label": "CPUs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 30,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Memory Allocation by Node (MB)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_node_mem_alloc"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Alloc: ${metric.labels.node}"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_node_mem_total"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Total: ${metric.labels.node}"
+              }
+            ],
+            "yAxis": {
+              "label": "MB"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 38,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "GPU Utilization % (by cluster)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (cluster) (slurm_node_gpu_alloc) / sum by (cluster) (slurm_node_gpu_total) * 100"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster}"
+              }
+            ],
+            "yAxis": {
+              "label": "%"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 38,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "CPU Utilization % (by cluster)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (cluster) (slurm_node_cpu_alloc) / sum by (cluster) (slurm_node_cpu_total) * 100"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster}"
+              }
+            ],
+            "yAxis": {
+              "label": "%"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 46,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## Job Activity",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 48,
+        "width": 8,
+        "height": 4,
+        "widget": {
+          "title": "Running",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_jobs_running"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 8,
+        "yPos": 48,
+        "width": 8,
+        "height": 4,
+        "widget": {
+          "title": "Pending",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_jobs_pending"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 48,
+        "width": 8,
+        "height": 4,
+        "widget": {
+          "title": "Completed",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_queue_completed"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 48,
+        "width": 8,
+        "height": 4,
+        "widget": {
+          "title": "Failed",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_queue_failed"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 48,
+        "width": 8,
+        "height": 4,
+        "widget": {
+          "title": "Canceled",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_queue_canceled"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 40,
+        "yPos": 48,
+        "width": 8,
+        "height": 4,
+        "widget": {
+          "title": "Preempted",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_queue_preempted"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 52,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Running vs Pending (by cluster)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_running"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Running"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_pending"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Pending"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_pending_dependency"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Pending (dep)"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 52,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Job Throughput (jobs/sec)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "rate(slurm_scheduler_jobs_completed[5m])"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Completed"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "rate(slurm_scheduler_jobs_failed[5m])"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Failed"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "rate(slurm_scheduler_jobs_submitted[5m])"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Submitted"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "rate(slurm_scheduler_jobs_started[5m])"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Started"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "rate(slurm_scheduler_jobs_cancelled[5m])"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Cancelled"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs/sec"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 52,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Queue Composition Over Time",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_completed"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "Completed"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_failed"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "Failed"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_canceled"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "Canceled"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_suspended"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "Suspended"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_timeout"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "Timeout"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_queue_node_fail"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "Node Fail"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 60,
+        "width": 48,
+        "height": 12,
+        "widget": {
+          "title": "Slurm Jobs (all clusters)",
+          "timeSeriesTable": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_job_state"
+                },
+                "minAlignmentPeriod": "60s"
+              }
+            ],
+            "columnSettings": [
+              {
+                "column": "cluster",
+                "visible": true
+              },
+              {
+                "column": "id",
+                "visible": true
+              },
+              {
+                "column": "name",
+                "visible": true
+              },
+              {
+                "column": "user",
+                "visible": true
+              },
+              {
+                "column": "account",
+                "visible": true
+              },
+              {
+                "column": "partition",
+                "visible": true
+              },
+              {
+                "column": "state",
+                "visible": true
+              },
+              {
+                "column": "value",
+                "visible": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "yPos": 72,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Job CPUs Allocated (by cluster)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (cluster, id, user) (slurm_job_cpus_allocated)"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.cluster} job:${metric.labels.id} ${metric.labels.user}"
+              }
+            ],
+            "yAxis": {
+              "label": "CPUs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 72,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Job Uptime (s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_job_uptime_seconds"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} job:${metric.labels.id} ${metric.labels.user}"
+              }
+            ],
+            "yAxis": {
+              "label": "seconds"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 80,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## Users and Accounts",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 82,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Pending Jobs per Partition",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (partition) (slurm_jobs_pending)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.partition}"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 82,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Running Jobs per Account",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (account) (slurm_jobs_running)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.account}"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 82,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Pending Jobs per Account",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (account) (slurm_jobs_pending)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.account}"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 90,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Running Jobs per User",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (user) (slurm_jobs_running)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.user}"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 90,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Pending Jobs per User",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (user) (slurm_jobs_pending)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.user}"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 90,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "GPUs Allocated per User",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (user) (slurm_job_gpus_allocated)"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.user}"
+              }
+            ],
+            "yAxis": {
+              "label": "GPUs"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 98,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "CPUs Allocated per Account",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (account) (slurm_job_cpus_allocated)"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.account}"
+              }
+            ],
+            "yAxis": {
+              "label": "CPUs"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 98,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "CPUs Allocated per User",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (user) (slurm_job_cpus_allocated)"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.user}"
+              }
+            ],
+            "yAxis": {
+              "label": "CPUs"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 106,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## Scheduler Health",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 108,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Scheduler Cycle Duration (s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_scheduler_cycle_last_seconds"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Last"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_scheduler_cycle_mean_seconds"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Mean"
+              }
+            ],
+            "yAxis": {
+              "label": "seconds"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 108,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Backfill Cycle Duration (s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_scheduler_backfill_cycle_last_seconds"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Last"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_scheduler_backfill_cycle_mean_seconds"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.cluster} Mean"
+              }
+            ],
+            "yAxis": {
+              "label": "seconds"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 108,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Controller RPC Rate (rpc/s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "topk(10, rate(slurm_controller_rpc_count[5m]))"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.message_type}"
+              }
+            ],
+            "yAxis": {
+              "label": "rpc/s"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 116,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "Scheduler Queue",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_scheduler_queue"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 12,
+        "yPos": 116,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "DBD Queue",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_scheduler_dbd_queue"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 116,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "Cycles/min",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_scheduler_cycles_per_minute"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 36,
+        "yPos": 116,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "Mean Cycle Depth",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "slurm_scheduler_cycle_mean_depth"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 120,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Backfill Jobs Total",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "rate(slurm_scheduler_backfilled_jobs_total[5m])"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Backfilled/sec"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "rate(slurm_scheduler_backfilled_jobs_cycle_total[5m])"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Per-cycle/sec"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs/sec"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 120,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Controller RPC Latency (s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "topk(10, slurm_controller_rpc_mean_duration_seconds)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.message_type}"
+              }
+            ],
+            "yAxis": {
+              "label": "seconds"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 120,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Backfill Depth Mean",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "slurm_scheduler_backfill_depth_mean"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Mean Depth"
+              }
+            ],
+            "yAxis": {
+              "label": "jobs"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 128,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## GPU Fleet Health (DCGM)",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 130,
+        "width": 12,
+        "height": 8,
+        "widget": {
+          "title": "Avg GPU Utilization (%)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "avg(DCGM_FI_DEV_GPU_UTIL)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Avg"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(DCGM_FI_DEV_GPU_UTIL)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Max"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "min(DCGM_FI_DEV_GPU_UTIL)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Min"
+              }
+            ],
+            "yAxis": {
+              "label": "%"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 12,
+        "yPos": 130,
+        "width": 12,
+        "height": 8,
+        "widget": {
+          "title": "Avg SM Active (%)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "avg(DCGM_FI_PROF_SM_ACTIVE) * 100"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Avg"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(DCGM_FI_PROF_SM_ACTIVE) * 100"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Max"
+              }
+            ],
+            "yAxis": {
+              "label": "%"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 130,
+        "width": 12,
+        "height": 8,
+        "widget": {
+          "title": "GPU Temperature (\u00b0C)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "avg(DCGM_FI_DEV_GPU_TEMP)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Avg"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(DCGM_FI_DEV_GPU_TEMP)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Max"
+              }
+            ],
+            "yAxis": {
+              "label": "\u00b0C"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 36,
+        "yPos": 130,
+        "width": 12,
+        "height": 8,
+        "widget": {
+          "title": "GPU Power (W)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "avg(DCGM_FI_DEV_POWER_USAGE)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Avg"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(DCGM_FI_DEV_POWER_USAGE)"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Total"
+              }
+            ],
+            "yAxis": {
+              "label": "Watts"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 138,
+        "width": 12,
+        "height": 8,
+        "widget": {
+          "title": "VRAM Usage Fleet (MiB)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(DCGM_FI_DEV_FB_USED)"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "Used"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(DCGM_FI_DEV_FB_FREE)"
+                },
+                "plotType": "STACKED_AREA",
+                "legendTemplate": "Free"
+              }
+            ],
+            "yAxis": {
+              "label": "MiB"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 12,
+        "yPos": 138,
+        "width": 12,
+        "height": 8,
+        "widget": {
+          "title": "Total PCIe Throughput (MB/s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(DCGM_FI_PROF_PCIE_TX_BYTES) / 1048576"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "TX"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(DCGM_FI_PROF_PCIE_RX_BYTES) / 1048576"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "RX"
+              }
+            ],
+            "yAxis": {
+              "label": "MB/s"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 138,
+        "width": 12,
+        "height": 8,
+        "widget": {
+          "title": "Tensor Core Active (%)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "avg(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE) * 100"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Avg"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE) * 100"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Max"
+              }
+            ],
+            "yAxis": {
+              "label": "%"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 36,
+        "yPos": 138,
+        "width": 12,
+        "height": 8,
+        "widget": {
+          "title": "DRAM Active (%)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "avg(DCGM_FI_PROF_DRAM_ACTIVE) * 100"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Avg"
+              },
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(DCGM_FI_PROF_DRAM_ACTIVE) * 100"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Max"
+              }
+            ],
+            "yAxis": {
+              "label": "%"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 146,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## GPU Health Checks (GCM)",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 148,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Active Failures by Check Type",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (type) (problem_gauge{reason=~\".*CheckFailed\"})"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.type}"
+              }
+            ],
+            "yAxis": {
+              "label": "failing nodes"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 148,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Check Pass Rate by Type",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "count by (type) (problem_gauge{reason=~\".*CheckPassed\"} == 1)"
+                },
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.type}"
+              }
+            ],
+            "yAxis": {
+              "label": "passing nodes"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 148,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Failure Events (30m window)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (reason) (increase(problem_counter[30m]))"
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.reason}"
+              }
+            ],
+            "yAxis": {
+              "label": "events"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 156,
+        "width": 48,
+        "height": 8,
+        "widget": {
+          "title": "GCM Alerts (nodes with active failures)",
+          "timeSeriesTable": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "problem_gauge{reason=~\".*CheckFailed\"} > 0"
+                },
+                "minAlignmentPeriod": "60s"
+              }
+            ],
+            "columnSettings": [
+              {
+                "column": "type",
+                "visible": true
+              },
+              {
+                "column": "pod",
+                "visible": true
+              },
+              {
+                "column": "reason",
+                "visible": true
+              },
+              {
+                "column": "value",
+                "visible": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "yPos": 164,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "title": "",
+          "text": {
+            "content": "## Node Host Metrics (GCE)",
+            "format": "MARKDOWN"
+          }
+        }
+      },
+      {
+        "yPos": 166,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Node CPU Load (1m avg)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"compute.googleapis.com/guest/cpu/load_1m\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.instance_name}"
+              }
+            ],
+            "yAxis": {
+              "label": "load"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 166,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Node Memory Used (bytes)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"compute.googleapis.com/guest/memory/bytes_used\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.instance_name}"
+              }
+            ],
+            "yAxis": {
+              "label": "bytes"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 32,
+        "yPos": 166,
+        "width": 16,
+        "height": 8,
+        "widget": {
+          "title": "Node Disk I/O (B/s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"compute.googleapis.com/instance/disk/read_bytes_count\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Read ${metric.labels.instance_name}"
+              },
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"compute.googleapis.com/instance/disk/write_bytes_count\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "legendTemplate": "Write ${metric.labels.instance_name}"
+              }
+            ],
+            "yAxis": {
+              "label": "B/s"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 174,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Node Network Ingress (B/s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"compute.googleapis.com/instance/network/received_bytes_count\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.instance_name}"
+              }
+            ],
+            "yAxis": {
+              "label": "B/s"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 174,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Node Network Egress (B/s)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"compute.googleapis.com/instance/network/sent_bytes_count\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "legendTemplate": "${metric.labels.instance_name}"
+              }
+            ],
+            "yAxis": {
+              "label": "B/s"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

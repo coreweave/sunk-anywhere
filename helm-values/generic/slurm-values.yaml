@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# ##############################################################################
+# # WARNING: UNVALIDATED                                                      #
+# # These values are a starting point for bare-metal or custom Kubernetes     #
+# # clusters. Adjust storageClassName, nodeSelectors, and GPU types to match  #
+# # your hardware. If you deploy SUNK on bare-metal, please report back.      #
+# ##############################################################################
+#
+# Generic/bare-metal overrides. Use with:
+#   helm install slurm <chart> -f helm-values/base/slurm-values.yaml -f helm-values/generic/slurm-values.yaml
+#
+# Replace placeholder values with your actual cluster configuration.
+
+controller:
+  stateVolume:
+    # Set to your cluster's StorageClass (e.g., ceph-block, local-path, nfs-client)
+    storageClassName: REPLACE_ME
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              # Replace with your CPU node label
+              - key: node-role.kubernetes.io/cpu
+                operator: Exists
+
+accounting:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/cpu
+                operator: Exists
+
+login:
+  sshKeyVolume:
+    storageClassName: REPLACE_ME
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/cpu
+                operator: Exists
+
+compute:
+  nodes:
+    cpu-workers:
+      nodeSelector:
+        # Replace with your CPU node label
+        node-role.kubernetes.io/cpu: ""
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/cpu
+                    operator: Exists
+    gpu-workers:
+      # Set gresGpu to match your GPUs (e.g., "a100:8", "h100:8")
+      gresGpu: "REPLACE_ME"
+      nodeSelector:
+        # Replace with your GPU node label
+        node-role.kubernetes.io/gpu: ""
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/gpu
+                    operator: Exists
+
+moco:
+  mysqlCluster:
+    persistence:
+      storageClassName: REPLACE_ME
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node-role.kubernetes.io/cpu
+                  operator: Exists
+
+scheduler:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/cpu
+                operator: Exists
+  config:
+    scheduler:
+      gpuTypes:
+        # Map your GPU types to Slurm GRES names
+        NVIDIA_A100: a100
+
+syncer:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/cpu
+                operator: Exists
+
+# Bare-metal topology configuration (if you have InfiniBand or custom fabric)
+# slurmConfig:
+#   TopologyPlugin: topology/tree
+#   TopologyParam: SwitchMaxLinks=256

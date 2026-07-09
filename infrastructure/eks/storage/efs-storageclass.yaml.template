@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+---
+# StorageClass for dynamically provisioning EFS Access Points under the
+# EFS filesystem created by setup-efs.sh. Each PVC that references `efs-sc`
+# gets its own access point (chroot'd subdirectory with a unique GID from
+# the range below).
+#
+# Rendered by setup-efs.sh (sed-substitutes __EFS_FS_ID__).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: __EFS_FS_ID__
+  directoryPerms: "755"
+  gidRangeStart: "1000"
+  gidRangeEnd: "2000"
+  basePath: "/dynamic_provisioning"
+reclaimPolicy: Delete

@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# SUNK Operator - Universal base values
+# Provider-agnostic SUNK operator configuration. Layer provider-specific overrides on top:
+#   helm install sunk <chart> -f helm-values/base/sunk-values.yaml -f helm-values/<provider>/sunk-values.yaml
+
+# Disable SUNK device plugin by default (most cloud providers have their own NVIDIA plugin)
+nvidia-device-plugin:
+  enabled: false
+
+operator:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  # No Prometheus or VictoriaMetrics operator installed by default
+  podMonitor:
+    enabled: false
+  vmPodScrape:
+    enabled: false
+
+syncer:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  podMonitor:
+    enabled: false
+  vmPodScrape:
+    enabled: false
+
+scheduler:
+  podMonitor:
+    enabled: false
+  vmPodScrape:
+    enabled: false
+
+# MOCO installed separately via its own chart
+moco:
+  enabled: false

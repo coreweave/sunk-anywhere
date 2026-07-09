@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# GMP PodMonitoring CRD to scrape SUNK Syncer metrics
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: sunk-syncer
+  namespace: tenant-slurm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sunk-syncer
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      timeout: 20s

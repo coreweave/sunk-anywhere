@@ -1,0 +1,228 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# GKE-specific overrides. Use with:
+#   helm install slurm <chart> -f helm-values/base/slurm-values.yaml -f helm-values/gke/slurm-values.yaml
+#
+# GKE assumptions:
+#   CPU nodes: 2x e2-standard-4 (~3.9 CPU, ~13 Gi allocatable each) in nodepool "cpu-4"
+#   GPU nodes: 1x g2-standard-4 (1x L4) in nodepool "gpu"
+
+controller:
+  stateVolume:
+    storageClassName: premium-rwo
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                  - cpu-4
+
+accounting:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                  - cpu-4
+
+login:
+  sshKeyVolume:
+    storageClassName: premium-rwo
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                  - cpu-4
+
+compute:
+  # Pyxis / enroot on GKE Container-Optimized OS.
+  #
+  # COS enforces AppArmor for pods. The slurmd container's chart default
+  # annotation references `localhost/enroot`, a profile COS does not ship.
+  # Installing a real `enroot` profile on COS requires a privileged
+  # nsenter-into-PID-1 DaemonSet that runs `apparmor_parser -r` against
+  # the host; that works on some COS versions but the host userland is
+  # minimal and `apparmor_parser` availability is not guaranteed.
+  #
+  # Pragmatic path (matches what customers run in the field, per the
+  # coreweave-internal Slack thread on COS/pyxis): tell the kubelet to
+  # run slurmd with AppArmor `unconfined`. This is equivalent to how EKS
+  # handles it (AL2023 doesn't enforce AppArmor at all). Since
+  # `compute.securityContext.privileged: true` already grants CAP_SYS_ADMIN
+  # for everything enroot needs, an AppArmor profile over the top adds no
+  # meaningful defense-in-depth.
+  #
+  # Seccomp is handled differently: COS's /var/lib/kubelet is writable and
+  # the universal seccomp-installer DaemonSet works there, so we keep the
+  # chart's default seccomp profile reference (not overridden here).
+  #
+  # See docs/universal/security-model.md for the full threat model and
+  # the per-cloud posture matrix (GKE row).
+  pyxis:
+    enabled: true
+    # `unconfined` overrides COS's default AppArmor profile for slurmd.
+    # If the chart ever starts refusing bare `unconfined` and insists on
+    # `localhost/<name>`, the fallback is to set this to "" and accept
+    # whatever the runtime applies; flip `enabled: false` if that breaks
+    # enroot on your COS image.
+    appArmorProfile: unconfined
+    plugstackOptions:
+      - container_scope=job
+    enrootConfig:
+      ENROOT_CACHE_PATH: /var/tmp/enroot-cache/user-$(id -u)
+      ENROOT_DATA_PATH: /var/tmp/enroot-data/user-$(id -u)
+      ENROOT_TEMP_PATH: /enroot
+
+  # s6 oneshots. GKE needs two:
+  #   1. nvidia-setup: drivers are bind-mounted at /usr/local/nvidia after
+  #      container start, so ldconfig and a nvidia-smi symlink must be
+  #      refreshed at boot or slurmd fails with "libnvidia-ml.so.1: cannot
+  #      open shared object file".
+  #   2. enroot-dirs: create /enroot + /var/tmp/enroot-{cache,data} with
+  #      mode 1777 so enroot's per-user subdirs (from enrootConfig above)
+  #      can land without collisions. Matches the EKS overlay.
+  s6:
+    nvidia-setup:
+      type: oneshot
+      script: |
+        #!/usr/bin/env bash
+        if [ -d /usr/local/nvidia/lib64 ]; then
+          echo /usr/local/nvidia/lib64 > /etc/ld.so.conf.d/nvidia.conf
+          ldconfig
+          ln -sf /usr/local/nvidia/bin/nvidia-smi /usr/local/bin/nvidia-smi 2>/dev/null || true
+        fi
+    enroot-dirs:
+      type: oneshot
+      timeoutUp: 0
+      timeoutDown: 0
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        mkdir -p /enroot
+        chmod 1777 /enroot
+        for dir in /var/tmp/enroot-cache /var/tmp/enroot-data; do
+          mkdir -p "${dir}"
+          chown root:root "${dir}"
+          chmod 1777 "${dir}"
+        done
+  nodes:
+    cpu-workers:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: cpu-4
+      # Bump cgroup memory above the base chart's 512Mi default. slurmd
+      # reads RealMemory from its cgroup memory limit, so the base
+      # default caps RealMemory at 512 MB -- then DefMemPerCPU=2000 *
+      # skuCpu=4 = 8000 MB and any `srun` without --mem fails with
+      # "Requested node configuration is not available." e2-standard-4
+      # has 16 GiB, so 12Gi limit leaves room for kubelet + system.
+      resources:
+        requests:
+          cpu: "1"
+          memory: 6Gi
+        limits:
+          memory: 12Gi
+      # OverSubscribe=FORCE:2 lets two single-CPU jobs share an
+      # e2-standard-4 (skuCpu>=2). Without it the default OverSubscribe=NO
+      # forces one-job-per-node and examples/10-cpu-share.sh has nothing
+      # to assert. Matches the EKS overlay.
+      partitionConfig:
+        OverSubscribe: "FORCE:2"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/gke-nodepool
+                    operator: In
+                    values:
+                      - cpu-4
+    gpu-workers:
+      gresGpu: "l4:1"
+      env:
+        - name: LD_LIBRARY_PATH
+          value: "/usr/local/nvidia/lib64"
+        - name: PATH
+          value: "/usr/local/nvidia/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      # g2-standard-4 has 16 GiB; bump cgroup memory high enough that
+      # enroot squashfs extraction of larger CUDA images (gpu-burn etc)
+      # doesn't OOM during pyxis import.
+      resources:
+        requests:
+          cpu: "1"
+          memory: 6Gi
+          nvidia.com/gpu: "1"
+        limits:
+          memory: 14Gi
+          nvidia.com/gpu: "1"
+      nodeSelector:
+        cloud.google.com/gke-nodepool: gpu
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/gke-nodepool
+                    operator: In
+                    values:
+                      - gpu
+
+moco:
+  mysqlCluster:
+    persistence:
+      storageClassName: premium-rwo
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: cloud.google.com/gke-nodepool
+                  operator: In
+                  values:
+                    - cpu-4
+
+syncer:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                  - cpu-4
+
+# Pod scheduler: pin name to "sunk" so `spec.schedulerName: sunk` manifests
+# (examples/04, 15) route to this scheduler. Matches the EKS overlay.
+# A prior version of this file had two top-level `scheduler:` blocks; YAML
+# parsers silently keep only the last, so the first was dead. Merged here.
+scheduler:
+  name: sunk
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                  - cpu-4
+
+# Pin DefMemPerCPU explicitly. e2-standard-4 has 4 vCPU / 16 GiB. After
+# reservedMemory: "0" the chart would auto-compute (16384 / 4) = 4096 per
+# CPU, but any small test pod with --mem=64M would still be constrained by
+# the per-partition default. Pin to a value that works across both
+# partitions so examples with no --mem flag don't fail scheduling.
+slurmConfig:
+  DefMemPerCPU: 2000

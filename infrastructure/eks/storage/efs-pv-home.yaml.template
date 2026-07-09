@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+---
+# Static PV + PVC for the shared Slurm /home mount, backed by the EFS
+# filesystem created by setup-efs.sh.
+#
+# Using a static PV (instead of dynamic provisioning via efs-sc) because
+# /home needs a stable volumeHandle across login, controller, and compute
+# pods. We mount the root of the filesystem.
+#
+# Rendered by substituting __EFS_FS_ID__ (e.g. `sed s/__EFS_FS_ID__/fs-abc/g`).
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: slurm-home-efs
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: efs-sc
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: __EFS_FS_ID__
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: slurm-home
+  namespace: tenant-slurm
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: slurm-home-efs

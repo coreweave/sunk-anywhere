@@ -1,0 +1,10 @@
+version = 1
+SPDX-PackageName = "sunk-anywhere"
+SPDX-PackageSupplier = "CoreWeave, Ltd"
+SPDX-PackageDownloadLocation = "https://github.com/coreweave/sunk-anywhere"
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2023-2026 CoreWeave, Ltd"
+SPDX-License-Identifier = "Apache-2.0"

@@ -1,0 +1,267 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# Grafana Helm values for GKE GPU monitoring
+# Deployed to monitoring namespace
+
+replicas: 1
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi
+
+tolerations:
+  - key: "sunk.coreweave.com/lock"
+    operator: "Exists"
+    effect: "NoExecute"
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: cloud.google.com/gke-nodepool
+              operator: In
+              values:
+                - cpu-4
+
+# Admin credentials
+adminUser: admin
+adminPassword: admin
+
+# Datasources
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: GMP-Prometheus
+        type: prometheus
+        url: http://gmp-frontend.monitoring.svc:9090
+        access: proxy
+        isDefault: true
+        editable: true
+
+# Dashboard providers
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: GPU Monitoring
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+# GPU dashboards
+dashboards:
+  default:
+    dcgm-gpu-overview:
+      json: |
+        {
+          "annotations": { "list": [] },
+          "editable": true,
+          "fiscalYearStartMonth": 0,
+          "graphTooltip": 1,
+          "id": null,
+          "links": [],
+          "panels": [
+            {
+              "title": "GPU Utilization",
+              "type": "timeseries",
+              "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+              "datasource": { "type": "prometheus", "uid": "${DS_GMP}" },
+              "targets": [
+                {
+                  "expr": "DCGM_FI_DEV_GPU_UTIL",
+                  "legendFormat": "{{gpu}} - {{Hostname}}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "min": 0,
+                  "max": 100,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      { "color": "green", "value": null },
+                      { "color": "yellow", "value": 70 },
+                      { "color": "red", "value": 90 }
+                    ]
+                  }
+                },
+                "overrides": []
+              }
+            },
+            {
+              "title": "GPU Memory Used (MiB)",
+              "type": "timeseries",
+              "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+              "datasource": { "type": "prometheus", "uid": "${DS_GMP}" },
+              "targets": [
+                {
+                  "expr": "DCGM_FI_DEV_FB_USED",
+                  "legendFormat": "{{gpu}} - {{Hostname}}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": { "unit": "decmbytes" },
+                "overrides": []
+              }
+            },
+            {
+              "title": "GPU Temperature (C)",
+              "type": "timeseries",
+              "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+              "datasource": { "type": "prometheus", "uid": "${DS_GMP}" },
+              "targets": [
+                {
+                  "expr": "DCGM_FI_DEV_GPU_TEMP",
+                  "legendFormat": "{{gpu}} - {{Hostname}}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "celsius",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      { "color": "green", "value": null },
+                      { "color": "yellow", "value": 75 },
+                      { "color": "red", "value": 90 }
+                    ]
+                  }
+                },
+                "overrides": []
+              }
+            },
+            {
+              "title": "GPU Power Usage (W)",
+              "type": "timeseries",
+              "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+              "datasource": { "type": "prometheus", "uid": "${DS_GMP}" },
+              "targets": [
+                {
+                  "expr": "DCGM_FI_DEV_POWER_USAGE",
+                  "legendFormat": "{{gpu}} - {{Hostname}}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": { "unit": "watt" },
+                "overrides": []
+              }
+            },
+            {
+              "title": "GPU SM Clock (MHz)",
+              "type": "timeseries",
+              "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+              "datasource": { "type": "prometheus", "uid": "${DS_GMP}" },
+              "targets": [
+                {
+                  "expr": "DCGM_FI_DEV_SM_CLOCK",
+                  "legendFormat": "{{gpu}} - {{Hostname}}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": { "unit": "rotmhz" },
+                "overrides": []
+              }
+            },
+            {
+              "title": "GPU Memory Clock (MHz)",
+              "type": "timeseries",
+              "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+              "datasource": { "type": "prometheus", "uid": "${DS_GMP}" },
+              "targets": [
+                {
+                  "expr": "DCGM_FI_DEV_MEM_CLOCK",
+                  "legendFormat": "{{gpu}} - {{Hostname}}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": { "unit": "rotmhz" },
+                "overrides": []
+              }
+            },
+            {
+              "title": "GPU Memory Free (MiB)",
+              "type": "timeseries",
+              "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+              "datasource": { "type": "prometheus", "uid": "${DS_GMP}" },
+              "targets": [
+                {
+                  "expr": "DCGM_FI_DEV_FB_FREE",
+                  "legendFormat": "{{gpu}} - {{Hostname}}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": { "unit": "decmbytes" },
+                "overrides": []
+              }
+            },
+            {
+              "title": "Tensor Core Utilization",
+              "type": "timeseries",
+              "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+              "datasource": { "type": "prometheus", "uid": "${DS_GMP}" },
+              "targets": [
+                {
+                  "expr": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+                  "legendFormat": "{{gpu}} - {{Hostname}}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+                "overrides": []
+              }
+            }
+          ],
+          "refresh": "30s",
+          "schemaVersion": 39,
+          "templating": {
+            "list": [
+              {
+                "current": {},
+                "hide": 0,
+                "includeAll": false,
+                "label": "Datasource",
+                "multi": false,
+                "name": "DS_GMP",
+                "options": [],
+                "query": "prometheus",
+                "queryValue": "",
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "type": "datasource"
+              }
+            ]
+          },
+          "time": { "from": "now-1h", "to": "now" },
+          "title": "DCGM GPU Overview",
+          "uid": "dcgm-gpu-overview"
+        }
+
+# Expose via LoadBalancer for easy access (can be changed to ClusterIP)
+service:
+  type: LoadBalancer
+  port: 80

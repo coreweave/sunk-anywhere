@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# Kubernetes pod scheduled through Slurm via the SUNK Pod Scheduler.
+# The pod's schedulerName must match the SUNK scheduler's configured name.
+# Deploy with: kubectl apply -f 04-validate-pod-scheduler.yaml
+# Check status: kubectl get pod sunk-scheduled-pod -n tenant-slurm
+# The pod should transition from Pending -> Running once Slurm allocates resources.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sunk-scheduled-pod
+  namespace: tenant-slurm
+spec:
+  schedulerName: sunk
+  # SUNK scheduler requires grace period strictly less than Slurm KillWait - 5s.
+  # Default KillWait is 30s, so must be <=24. Default Pod grace period is 30s,
+  # which the scheduler rejects with "termination grace period must be less
+  # than Slurm KillWait - 5s". Keep this explicit on every schedulerName: sunk Pod.
+  terminationGracePeriodSeconds: 20
+  tolerations:
+    - key: sunk.coreweave.com/lock
+      operator: Exists
+      effect: NoExecute
+  containers:
+    - name: test
+      image: busybox:1.36
+      command: ["sh", "-c", "echo 'Scheduled by SUNK pod scheduler'; hostname; sleep 30"]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+  restartPolicy: Never

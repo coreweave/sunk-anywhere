@@ -1,0 +1,158 @@
+# SPDX-FileCopyrightText: 2023-2026 CoreWeave, Ltd
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-PackageName: sunk-anywhere
+
+# AppArmor profile installer for Pyxis/enroot.
+#
+# When SUNK runs in unprivileged mode (Pyxis + enroot without
+# privileged: true on the compute pods), Pyxis attaches the AppArmor
+# profile named `enroot` to the container. On hosts where AppArmor is
+# enforced (Ubuntu, Debian-based images, BYO Ubuntu k3s/kubeadm),
+# the profile must already be loaded into the kernel or pod start fails
+# with:
+#   AppArmor profile "enroot" is not loaded
+#
+# Managed Kubernetes distros that use AL2/AL2023/Bottlerocket do not
+# ship `apparmor_parser`, and AppArmor is not enforced on those nodes;
+# this DaemonSet detects that case and exits 0 (no-op) so it remains
+# safe to apply universally.
+#
+# The profile content is sourced from the canonical CoreWeave profile
+# vendored at infrastructure/universal/apparmor-profiles/enroot.profile
+# (see that file's header for upstream provenance). To update, mirror
+# the profile content into the ConfigMap below.
+#
+# Apply this BEFORE `helm install slurm` when compute uses the
+# unprivileged enroot path on Ubuntu-family nodes.
+#
+# This DaemonSet mirrors the seccomp-installer pattern in this
+# directory: an init container performs the install on the host and
+# exits, then a `pause` sidecar keeps the pod Ready so the kubelet
+# does not restart and re-run the init on every reconcile.
+#
+# Live-cluster acceptance test (NOT yet executed; gated behind the
+# Ubuntu smoke-test work):
+#   kubectl debug node/<NODE> -it --image=ubuntu -- \
+#     chroot /host apparmor_status | grep enroot
+# Expected: the `enroot` profile shows up under "loaded".
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apparmor-installer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: enroot-apparmor-profile
+  namespace: apparmor-installer
+data:
+  enroot: |
+    #include <tunables/global>
+
+    profile enroot flags=(attach_disconnected,mediate_deleted) {
+      #include <abstractions/base>
+
+      # added
+      mount,
+      pivot_root,
+      ptrace,
+
+      # defaults
+      network,
+      capability,
+      file,
+      umount,
+
+      deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
+      # deny write to files not in /proc/<number>/** or /proc/sys/**
+      deny @{PROC}/{[^1-9],[^1-9][^0-9],[^1-9s][^0-9y][^0-9s],[^1-9][^0-9][^0-9][^0-9/]*}/** w,
+      deny @{PROC}/sys/[^k]** w,  # deny /proc/sys except /proc/sys/k* (effectively /proc/sys/kernel)
+      deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,  # deny everything except shm* in /proc/sys/kernel/
+      deny @{PROC}/sysrq-trigger rwklx,
+      deny @{PROC}/kcore rwklx,
+
+      deny /sys/[^f]*/** wklx,
+      deny /sys/f[^s]*/** wklx,
+      deny /sys/fs/[^c]*/** wklx,
+      deny /sys/fs/c[^g]*/** wklx,
+      deny /sys/fs/cg[^r]*/** wklx,
+      deny /sys/firmware/** rwklx,
+      deny /sys/kernel/security/** rwklx,
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: apparmor-installer
+  namespace: apparmor-installer
+  labels:
+    app.kubernetes.io/name: apparmor-installer
+    app.kubernetes.io/part-of: sunk-anywhere
+spec:
+  selector:
+    matchLabels:
+      app: apparmor-installer
+  template:
+    metadata:
+      labels:
+        app: apparmor-installer
+    spec:
+      # Tolerate every taint we know about so the installer reaches
+      # GPU and Slurm-lock nodes. Mirrors seccomp-installer.
+      tolerations:
+        - operator: Exists
+      hostPID: true
+      hostNetwork: false
+      initContainers:
+        - name: install-apparmor-profile
+          image: busybox:1.36
+          securityContext:
+            privileged: true
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              # Stage the profile onto the host filesystem first so
+              # that nsenter'd apparmor_parser can read it from the
+              # host's own /etc/apparmor.d.
+              mkdir -p /host/etc/apparmor.d
+              cp /profile/enroot /host/etc/apparmor.d/enroot
+              chmod 0644 /host/etc/apparmor.d/enroot
+              # Run the parser in the host's mount + pid namespace.
+              # If apparmor_parser is absent (AL2/AL2023/Bottlerocket),
+              # AppArmor is not enforced on this host -- exit 0 so the
+              # DaemonSet stays a no-op there.
+              nsenter -t 1 -m -p -- /bin/sh -c '
+                if ! command -v apparmor_parser >/dev/null 2>&1; then
+                  echo "apparmor_parser not present on host; skipping (no-op on AL2/AL2023/Bottlerocket)"
+                  exit 0
+                fi
+                apparmor_parser -r /etc/apparmor.d/enroot
+                echo "loaded enroot profile on $(hostname)"
+                apparmor_status 2>/dev/null | grep -A1 enroot || true
+              '
+          volumeMounts:
+            - name: host-apparmor-d
+              mountPath: /host/etc/apparmor.d
+            - name: profile-source
+              mountPath: /profile
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+      volumes:
+        - name: host-apparmor-d
+          hostPath:
+            path: /etc/apparmor.d
+            type: DirectoryOrCreate
+        - name: profile-source
+          configMap:
+            name: enroot-apparmor-profile
