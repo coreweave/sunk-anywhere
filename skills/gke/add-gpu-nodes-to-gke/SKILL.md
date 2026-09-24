@@ -237,6 +237,10 @@ If `python3` or `torch` is not available in the container image, the `nvidia-smi
 
 This template tests GPU-to-GPU communication across nodes using NCCL all-reduce. It requires at least 2 GPU nodes in the node pool and `all_reduce_perf` from the [nccl-tests](https://github.com/NVIDIA/nccl-tests) suite installed in the container image.
 
+Build `nccl-tests` with `MPI=1` and an MPI runtime compatible with Slurm's
+PMIx plugin. Confirm that `srun --mpi=list` lists `pmix` before submitting
+the job. The `srun` command below launches one MPI rank per node.
+
 **Run when GPU quota allows.** The default GKE `GPUS_ALL_REGIONS` quota is typically 1, which limits you to a single GPU node. Request a quota increase before attempting multi-node tests.
 
 Save as `nccl-test.sbatch` on the login node (or pipe via `kubectl exec`):
@@ -250,7 +254,7 @@ Save as `nccl-test.sbatch` on the login node (or pipe via `kubectl exec`):
 #SBATCH --ntasks-per-node=1
 #SBATCH --output=nccl_%j.out
 
-/usr/bin/all_reduce_perf -b 8 -e 256M -f 2 -g 1
+srun --mpi=pmix /usr/bin/all_reduce_perf -b 8 -e 256M -f 2 -g 1
 ```
 
 **Prerequisites for multi-node NCCL on GKE (full checklist):**
